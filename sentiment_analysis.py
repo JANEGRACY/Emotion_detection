@@ -1,27 +1,70 @@
 import cv2
-from deepface import DeepFace   #DeepLearning Model for facial recognition
-import pandas as pd
+from deepface import DeepFace
 from datetime import datetime
+import mysql.connector
+import time
 
-cap = cv2.VideoCapture(0)  # try 1 if not working--- 0 is for webcam in laptop
-data = []
+# Connect to MySQL
+conn = mysql.connector.connect(
+    host="localhost",
+    user="root",
+    password="",
+    database="emotion_db"
+)
+
+cursor = conn.cursor()
+
+cap = cv2.VideoCapture(0)
+
+if not cap.isOpened():
+    print("Camera not working!")
+    exit()
+
+print("Press 'q' to quit")
+
+last_saved = time.time()
 
 while True:
+
     ret, frame = cap.read()
 
     if not ret:
-        print("Camera not working ❌")
         break
 
-    result = DeepFace.analyze(frame, actions=['emotion'], enforce_detection=False)
-    emotion = result[0]['dominant_emotion']
+    try:
+        result = DeepFace.analyze(
+            frame,
+            actions=['emotion'],
+            enforce_detection=False
+        )
 
-    print(emotion)  # debug output
+        emotion = result[0]['dominant_emotion']
 
-    data.append([datetime.now(), emotion])
+        # Save only once every second
+        if time.time() - last_saved >= 1:
 
-    cv2.putText(frame, emotion, (50,50),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+            current_time = datetime.now()
+
+            sql = "INSERT INTO emotions(time, emotion) VALUES(%s,%s)"
+            cursor.execute(sql, (current_time, emotion))
+            conn.commit()
+
+            print(current_time, emotion)
+
+            last_saved = time.time()
+
+        cv2.putText(
+            frame,
+            emotion,
+            (50,50),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0,255,0),
+            2
+        )
+
+    except Exception as e:
+        print(e)
 
     cv2.imshow("Emotion Detection", frame)
 
@@ -31,5 +74,7 @@ while True:
 cap.release()
 cv2.destroyAllWindows()
 
-df = pd.DataFrame(data, columns=["Time", "Emotion"])
-df.to_csv("emotion_data.csv", index=False)
+cursor.close()
+conn.close()
+
+print("Data saved successfully.")
