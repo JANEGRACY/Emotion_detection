@@ -8,7 +8,7 @@ import time
 conn = mysql.connector.connect(
     host="localhost",
     user="root",
-    password="jane123",
+    password="",
     database="emotion_db"
 )
 
